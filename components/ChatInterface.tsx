@@ -182,37 +182,77 @@ export default function ChatInterface() {
       });
 
       if (!response.ok) {
-        let errorMessage = 'Failed to send message';
+        // レスポンス情報を先に取得（response.text()を呼ぶ前に）
+        const status = response.status;
+        const statusText = response.statusText;
+        const responseUrl = response.url;
+        
+        let errorMessage = `HTTP ${status}: ${statusText || 'Unknown error'}`;
         let errorDetails = '';
+        let errorData = null;
+        
         try {
           const errorText = await response.text();
-          errorDetails = errorText;
-          try {
-            const errorData = JSON.parse(errorText);
-            errorMessage = errorData.error || errorData.message || errorData.details || errorMessage;
-            if (errorData.details) {
-              errorDetails = typeof errorData.details === 'string' ? errorData.details : JSON.stringify(errorData.details);
+          console.log('[DEBUG] Error response text:', errorText);
+          console.log('[DEBUG] Response status:', status);
+          console.log('[DEBUG] Response statusText:', statusText);
+          
+          if (errorText && errorText.trim()) {
+            errorDetails = errorText;
+            try {
+              errorData = JSON.parse(errorText);
+              console.log('[DEBUG] Parsed error data:', errorData);
+              errorMessage = errorData.error || errorData.message || errorData.details || errorMessage;
+              if (errorData.details) {
+                errorDetails = typeof errorData.details === 'string' 
+                  ? errorData.details 
+                  : JSON.stringify(errorData.details, null, 2);
+              } else if (errorData.message) {
+                errorDetails = errorData.message;
+              }
+            } catch (e) {
+              // JSONではない場合はそのまま使用
+              console.log('[DEBUG] Error text is not JSON, using as-is');
+              errorMessage = errorText;
+              errorDetails = errorText;
             }
-          } catch (e) {
-            // JSONではない場合はそのまま使用
-            errorMessage = errorText || `HTTP ${response.status}: ${response.statusText}`;
+          } else {
+            // レスポンスボディが空の場合
+            errorMessage = `HTTP ${status}: ${statusText || 'Unknown error'}`;
+            errorDetails = `サーバーからエラーレスポンスが返されましたが、詳細情報がありません。`;
           }
         } catch (e) {
-          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+          console.error('[DEBUG] Error reading response:', e);
+          errorMessage = `HTTP ${status}: ${statusText || 'Unknown error'}`;
+          errorDetails = e instanceof Error ? e.message : String(e);
         }
         
-        const fullErrorMessage = errorDetails 
+        // エラーメッセージが空の場合はフォールバック
+        if (!errorMessage || errorMessage.trim() === '') {
+          errorMessage = `HTTP ${status}: ${statusText || 'Unknown error'}`;
+        }
+        
+        const fullErrorMessage = errorDetails && errorDetails.trim()
           ? `${errorMessage}\n\n詳細: ${errorDetails}`
           : errorMessage;
         
-        console.error('API Error:', {
-          status: response.status,
-          statusText: response.statusText,
-          errorMessage,
-          errorDetails,
-        });
+        // デバッグ用のログ
+        const errorLogObject = {
+          status: status,
+          statusText: statusText || '(empty)',
+          errorMessage: errorMessage || '(empty)',
+          errorDetails: errorDetails || '(empty)',
+          errorData: errorData || '(null)',
+          url: responseUrl || '(empty)',
+        };
         
-        throw new Error(fullErrorMessage);
+        console.error('[DEBUG] API Error Details:', errorLogObject);
+        console.error('[DEBUG] Full error message:', fullErrorMessage);
+        
+        setError(fullErrorMessage);
+        setIsLoading(false);
+        setStreamingContent('');
+        return;
       }
 
       const reader = response.body?.getReader();
@@ -518,7 +558,7 @@ export default function ChatInterface() {
             </div>
             <div className="h-20 flex items-center border-l border-gray-600/50 pl-4">
               <h1 className="text-xl font-extrabold text-gray-100 tracking-widest uppercase" style={{ fontFamily: 'var(--font-outfit)', letterSpacing: '0.15em' }}>
-                NITTONO専用AIツール
+                NITTONO社専用状況適応謝罪AI
               </h1>
             </div>
           </div>
