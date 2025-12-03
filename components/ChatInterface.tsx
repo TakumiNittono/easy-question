@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, FormEvent, KeyboardEvent } from 'react';
 import Image from 'next/image';
 import ReactMarkdown from 'react-markdown';
-import { Send, Bot, User, LogIn, UserPlus, X, MessageSquare, Plus, Trash2, Menu, ChevronLeft } from 'lucide-react';
+import { Send, Bot, User, LogIn, UserPlus, X, MessageSquare, Plus, Trash2, Menu, ChevronLeft, Paperclip } from 'lucide-react';
 import { clsx } from 'clsx';
 
 interface Message {
@@ -34,6 +34,8 @@ export default function ChatInterface() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [showFileMenu, setShowFileMenu] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // localStorageから会話履歴を読み込む
   useEffect(() => {
@@ -375,13 +377,32 @@ export default function ChatInterface() {
   // ESCキーでモーダルを閉じる
   useEffect(() => {
     const handleEscape = (e: globalThis.KeyboardEvent) => {
-      if (e.key === 'Escape' && showAuthModal) {
-        setShowAuthModal(false);
+      if (e.key === 'Escape') {
+        if (showAuthModal) {
+          setShowAuthModal(false);
+        }
+        if (showFileMenu) {
+          setShowFileMenu(false);
+        }
       }
     };
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
-  }, [showAuthModal]);
+  }, [showAuthModal, showFileMenu]);
+
+  // メニューの外側をクリックしたら閉じる
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (showFileMenu && fileInputRef.current && !fileInputRef.current.contains(e.target as Node)) {
+        const target = e.target as HTMLElement;
+        if (!target.closest('[aria-label="ファイルを追加"]')) {
+          setShowFileMenu(false);
+        }
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showFileMenu]);
 
   return (
     <div className="flex h-screen bg-gradient-to-b from-[#212121] via-[#2d2d3a] to-[#212121] text-white">
@@ -642,13 +663,60 @@ export default function ChatInterface() {
           <div className="mx-auto max-w-3xl">
           <form onSubmit={handleSubmit} className="relative">
             <div className="relative rounded-2xl border border-gray-600/50 bg-[#40414f] shadow-lg transition-all focus-within:border-[#10a37f]/50 focus-within:ring-2 focus-within:ring-[#10a37f]/20">
+              {/* プラスボタンとメニュー */}
+              <div className="absolute left-3 bottom-3 z-10">
+                <button
+                  type="button"
+                  onClick={() => setShowFileMenu(!showFileMenu)}
+                  className="flex items-center justify-center w-9 h-9 rounded-lg hover:bg-gray-600/50 transition-colors text-gray-400 hover:text-gray-300"
+                  aria-label="ファイルを追加"
+                >
+                  <Plus className="h-5 w-5" />
+                </button>
+                
+                {/* ファイルメニュー */}
+                {showFileMenu && (
+                  <div className="absolute bottom-full left-0 mb-2 w-64 rounded-lg bg-[#2d2d3a] border border-gray-700/50 shadow-2xl overflow-hidden animate-fade-in">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        fileInputRef.current?.click();
+                        setShowFileMenu(false);
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700/50 transition-colors text-left text-gray-200"
+                    >
+                      <Paperclip className="h-5 w-5 text-gray-400 flex-shrink-0" />
+                      <span className="text-sm">写真とファイルを追加</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* 隠しファイル入力 */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept="image/*,.pdf,.doc,.docx,.txt"
+                className="hidden"
+                onChange={(e) => {
+                  const files = e.target.files;
+                  if (files && files.length > 0) {
+                    // ファイル選択時の処理
+                    console.log('Selected files:', Array.from(files));
+                    // TODO: ファイルをアップロードする処理を実装
+                    alert(`${files.length}個のファイルが選択されました`);
+                  }
+                }}
+              />
+
               <textarea
                 ref={textareaRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="メッセージを入力..."
-                className="w-full resize-none rounded-2xl bg-transparent px-5 py-4 pr-14 text-white placeholder-gray-400 focus:outline-none focus:ring-0"
+                className="w-full resize-none rounded-2xl bg-transparent px-5 py-4 pl-12 pr-14 text-white placeholder-gray-400 focus:outline-none focus:ring-0"
                 rows={1}
                 style={{
                   maxHeight: '200px',
